@@ -1,0 +1,121 @@
+package simpledb;
+
+import java.io.IOException;
+
+/**
+ * Inserts tuples read from the child operator into the tableId specified in the
+ * constructor
+ */
+public class Insert extends Operator {
+
+    private static final long serialVersionUID = 1L;
+
+    private TransactionId tid;
+    private OpIterator child;
+    private int tableId;
+
+    //返回tuple的属性行，一个Integer字段，表示受影响的元组个数
+    private TupleDesc tupleDesc;
+    private int count;
+    boolean isInserted;
+
+
+    /**
+     * Constructor.
+     *
+     * @param t
+     *            The transaction running the insert.
+     * @param child
+     *            The child operator from which to read tuples to be inserted.
+     * @param tableId
+     *            The table in which to insert tuples.
+     * @throws DbException
+     *             if TupleDesc of child differs from table into which we are to
+     *             insert.
+     */
+    public Insert(TransactionId t, OpIterator child, int tableId)
+            throws DbException {
+        // some code goes here
+        this.tid=t;
+        this.child=child;
+        this.tableId=tableId;
+        this.count=-1;
+        this.isInserted=false;
+        Type[] fieldType=new Type[]{Type.INT_TYPE};
+        //String[] fieldName=new String[]{null};
+        this.tupleDesc=new TupleDesc(fieldType);
+    }
+
+    public TupleDesc getTupleDesc() {
+        // some code goes here
+        return this.tupleDesc;
+    }
+
+    public void open() throws DbException, TransactionAbortedException {
+        // some code goes here
+        this.count=0;
+        this.child.open();
+        super.open();
+    }
+
+    public void close() {
+        // some code goes here
+        super.close();
+        this.child.close();
+        this.count=-1;
+        this.isInserted=false;
+    }
+
+    public void rewind() throws DbException, TransactionAbortedException {
+        // some code goes here
+        this.child.rewind();
+        this.count=0;
+        this.isInserted=false;
+
+    }
+
+    /**
+     * Inserts tuples read from child into the tableId specified by the
+     * constructor. It returns a one field tuple containing the number of
+     * inserted records. Inserts should be passed through BufferPool. An
+     * instances of BufferPool is available via Database.getBufferPool(). Note
+     * that insert DOES NOT need check to see if a particular tuple is a
+     * duplicate before inserting it.
+     *
+     * @return A 1-field tuple containing the number of inserted records, or
+     *         null if called more than once.
+     * @see Database#getBufferPool
+     * @see BufferPool#insertTuple
+     */
+    protected Tuple fetchNext() throws TransactionAbortedException, DbException {
+        // some code goes here
+        if(this.isInserted){
+            return null;
+        }
+        this.isInserted=true;
+        while(this.child.hasNext()){
+            try {
+                Database.getBufferPool().insertTuple(this.tid,this.tableId,child.next());
+                this.count++;
+            } catch (IOException e) {
+                e.printStackTrace();
+                break;
+            }
+        }
+        Tuple tuple=new Tuple(this.tupleDesc);
+        tuple.setField(0,new IntField(this.count));
+        return tuple;
+    }
+
+    @Override
+    public OpIterator[] getChildren() {
+        // some code goes here
+        return new OpIterator[]{this.child};
+    }
+
+    @Override
+    public void setChildren(OpIterator[] children) {
+        // some code goes here
+        this.child=children[0];
+    }
+}
